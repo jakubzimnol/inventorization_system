@@ -7,6 +7,7 @@ class Products(models.Model):
     category = models.CharField(max_length=120)
     owner = models.ForeignKey('auth.User', related_name='products', null=True, on_delete=models.SET_NULL)
     #owner = models.ForeignKey(User, null=True, on_delete= models.SET_NULL, related_name='my_products')
-
+    #deny_token = models.CharField()
+    #allow_token = models.CharField()
 
 
