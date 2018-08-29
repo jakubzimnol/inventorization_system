@@ -1,4 +1,6 @@
 Django~=2.1.0
 djangorestframework~=3.8.2
-django-easy-pdf
+django-easy-pdf>=0.1.1
 WeasyPrint>=0.34
+django-rest-swagger
+django-filter>=2.0.0

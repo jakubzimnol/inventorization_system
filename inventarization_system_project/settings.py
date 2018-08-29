@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'inventorization_app',
     'rest_framework',
     'easy_pdf',
+    'rest_framework_swagger',
+    'django_filters',
 ]
 
 MIDDLEWARE = [

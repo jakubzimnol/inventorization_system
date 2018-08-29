@@ -1,6 +1,6 @@
 from .models import Products
 from django.shortcuts import render
-#from django.contrib.auth.models import User
+from django.contrib.auth.models import User
 from rest_framework import permissions
 from .permissions import IsAdminOrOwnerOrReadOnly
 from easy_pdf.views import PDFTemplateView
@@ -14,6 +14,11 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.urls import reverse
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+import django_filters.rest_framework
+from rest_framework import filters
 
 def send_mail_to_admin(request, pk=None):
     user=request.user
@@ -23,8 +28,8 @@ def send_mail_to_admin(request, pk=None):
     #product.save()
     #product = get_object_or_404(Products, id=pk)
     #message = user.username + ' wants to borrow ' +product.name+ '. Do you agree?'    
-    domain_accept = request.build_absolute_uri(reverse('products:deny_access', args=[product.id,]))
-    domain_deny = request.build_absolute_uri(reverse( 'products:deny_access', args=[product.id]))
+    domain_accept = request.build_absolute_uri(reverse('products:owner_accept', args=[user.id,product.id,]))
+    domain_deny = request.build_absolute_uri(reverse( 'products:owner_deny', args=[user.id,product.id]))
     context = {
         'product':product,
         'user':user,
@@ -35,11 +40,7 @@ def send_mail_to_admin(request, pk=None):
     text_content = strip_tags(html_content)
     msg = EmailMultiAlternatives(subject, text_content, from_email, [to])
     msg.attach_alternative(html_content, "text/html")
-    msg.send() 
-    
-    
-    #user = request.user
-
+    msg.send()
 
     #send_mail(
         #'Borrow request',
@@ -50,23 +51,63 @@ def send_mail_to_admin(request, pk=None):
     #)
     return render(request, 'test.html')
 
-class CheckAcessView(viewsets.ViewSet):
-    def list(self, request):
-        queryset = User.objects.all()
-        serializer = UserSerializer(queryset, many=True)
-        return Response(serializer.data)
+class AcceptOwnerView(viewsets.ViewSet):
+    serializer_class = Api_serializer
 
-    def retrieve(self, request, pk=None):
-        queryset = User.objects.all()
-        user = get_object_or_404(queryset, pk=pk)
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
+    def retrive(self, request, user, pk): 
+        queryset = Products.objects.filter(id=pk)
+        product = get_object_or_404(Products, id=pk)
+        user = get_object_or_404(User, id=user)
+        product.owner = user
+        product.save()
+        serializer = Api_serializer(data=product)
+        if serializer.is_valid():
+            return Response(serializer.data, 
+                            status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)          
+        
+
+    #@action(methods=['put'], detail=False)
+    #def accept(self, request, user, pk):
+        #queryset = Products.objects.filter(id=request.kwargs['pk'])
+        #product = get_object_or_404(Products, id=request.kwargs['pk'])
+        #user = get_object_or_404(Products, id=request.kwargs['user'])
+        #print(product)
+        #print(user)
+        #try:
+            #product.owner = user
+            #product.save()
+            #print(product)
+            #return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        #except EmptyBattle as e:
+            #return Response(e.value, status=status.HTTP_400_BAD_REQUEST)
+            
+            
+class DenyOwnerView(viewsets.ViewSet):  
+
+    def retrive(self, request, user, pk): 
+        queryset = Products.objects.filter(id=pk)
+        product = get_object_or_404(Products, id=pk)
+        user = get_object_or_404(User, id=user)
+    
+        serializer = Api_serializer(data=product)
+        if serializer.is_valid():
+            return Response(serializer.data, 
+                            status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)  
 
 
 class ProductListView(generics.ListAPIView):
     queryset = Products.objects.all()
     serializer_class = Api_serializer
     permission_classes = (IsAuthenticated,)
+    filter_backends = (filters.SearchFilter, django_filters.rest_framework.DjangoFilterBackend)
+    search_fields = ('product_key', 'name', 'category')
+    filter_fields = ('product_key', 'name', 'category')
 
 class ProductCreateView(generics.CreateAPIView):
     queryset = Products.objects.all()
