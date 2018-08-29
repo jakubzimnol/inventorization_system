@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventorization_app',
+    'rest_framework',
+    'easy_pdf',
 ]
 
 MIDDLEWARE = [
