@@ -4,3 +4,4 @@ django-easy-pdf>=0.1.1
 WeasyPrint>=0.34
 django-rest-swagger
 django-filter>=2.0.0
+djangorestframework-jwt

@@ -21,6 +21,7 @@ schema_view = get_swagger_view(title='Pastebin API')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    re_path(r'^$', schema_view),
     re_path(r'^products/', include("inventorization_app.urls", namespace='products')),
     re_path(r'^api-auth/', include('rest_framework.urls'))
 ]
