@@ -59,18 +59,6 @@ class AcceptSerializer(serializers.Serializer):
         return instance
 
 class DenySerializer(AcceptSerializer):
-    # token = serializers.CharField(max_length=20, default='') 
-    # product_id = serializers.IntegerField()
-    # user_id = serializers.IntegerField()
-
-    # def validate(self, data):
-    #     product_id = data['product_id']
-    #     token = data['token']
-    #     product = get_object_or_404(Products, id=product_id)
-    #     if token != product.allow_token:
-    #         raise serializers.ValidationError("Product.token is not equal to token")
-    #     return data
-
     def create(self, validated_data):
         product = get_object_or_404(Products, id=validated_data['product_id'])
         user = get_object_or_404(User, id=validated_data['user_id'])
@@ -97,7 +85,6 @@ class EmailSerializer(serializers.Serializer):
         product = get_object_or_404(Products, id=product_id)
         product.allow_token = generate_token(10)
         product.save()
-        #domain_accept = self.reverse_action('accept_owner', args=[user.id,product.id,product.allow_token])
         domain_accept = request.build_absolute_uri(reverse('products:products-accept', kwargs={'user_id':user.id,'pk':product.id,'token':product.allow_token}))
         domain_deny = request.build_absolute_uri(reverse( 'products:products-deny', kwargs={'user_id':user.id,'pk':product.id,'token':product.allow_token}))
         context = {
