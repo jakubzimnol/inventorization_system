@@ -9,6 +9,7 @@ from rest_framework import filters
 from rest_framework.permissions import IsAdminUser 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.decorators import permission_classes
 import django_filters.rest_framework
 from .models import Products
 from .serializers import ApiSerializer
@@ -20,11 +21,26 @@ from .permissions import IsAdminOrOwnerOrReadOnly
 
 class ProductViewSet(viewsets.ViewSet):
     serializer_class = ApiSerializer
+    permission_classes_by_action = {'list': [IsAuthenticated],
+                                   'create': [IsAdminUser],
+                                   'retrieve': [IsAuthenticated],
+                                   'update': [IsAdminOrOwnerOrReadOnly, IsAuthenticated],
+                                   'destroy': [IsAdminUser],
+                                   'accept_owner': [IsAdminUser],
+                                   'deny_owner': [IsAdminUser],
+                                   'send_mail_to_admin': [IsAuthenticated],}
+                                   
+    def get_permissions(self):
+        try:
+            # return permission_classes depending on `action`
+            return [permission() for permission in self.permission_classes_by_action[self.action]]
+        except KeyError:
+            # action is not set return default permission_classes
+            return [permission() for permission in self.permission_classes]
 
     def list(self, request):
         queryset = Products.objects.all()
         serializer = ApiSerializer(queryset, many=True)
-        permission_classes = (IsAuthenticated,)
         filter_backends = (filters.SearchFilter, django_filters.rest_framework.DjangoFilterBackend)
         search_fields = ('product_key', 'name', 'category')
         filter_fields = ('product_key', 'name', 'category')
@@ -34,18 +50,15 @@ class ProductViewSet(viewsets.ViewSet):
         queryset = Products.objects.all()
         product = get_object_or_404(queryset, pk=pk)
         serializer = ApiSerializer(product)
-        permission_classes = (IsAuthenticated, )
         return Response(serializer.data)
 
     def update(self, request, pk=None):
         queryset = Products.objects.all()
         product = get_object_or_404(queryset, pk=pk)
         serializer = ApiSerializer(product)
-        permission_classes = (IsAdminOrOwnerOrReadOnly, IsAuthenticated, )
         return Response(serializer.data)
 
     def create(self, request):
-        permission_classes = (IsAdminUser,)
         serializer = ApiSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -56,7 +69,6 @@ class ProductViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         product = get_object_or_404(self.queryset, pk=pk)
         serializer = ApiSerializer(product)
-        permission_classes = (IsAdminUser,)
         return Response(serializer.data)
 
     @action(methods=['post'], detail=True, url_path=r'accept/(?P<user_id>\d+)/(?P<token>\w+)', url_name='accept')
