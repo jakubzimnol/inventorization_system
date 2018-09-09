@@ -10,7 +10,6 @@ import secrets
 generate_token = secrets.token_urlsafe
 
 class ApiSerializer(serializers.ModelSerializer):
-
     owner = serializers.ReadOnlyField(source='owner.username')
     class Meta:
         model = Products
@@ -30,7 +29,6 @@ class ApiSerializer(serializers.ModelSerializer):
         product.save()
         return product
 
-
 class AcceptSerializer(serializers.Serializer):
     token = serializers.CharField(max_length=20, default='') 
     product_id = serializers.IntegerField()
@@ -44,34 +42,32 @@ class AcceptSerializer(serializers.Serializer):
             raise serializers.ValidationError("Product.token is not equal to token")
         return data
 
-    def create(self, validated_data):
-        product = get_object_or_404(Products, id=validated_data['product_id'])
-        user = get_object_or_404(User, id=validated_data['user_id'])
+    def change_owner(self, instantce):
+        product = get_object_or_404(Products, id=instantce['product_id'])
+        user = get_object_or_404(User, id=instantce['user_id'])
         product.owner = user
         product.save()
-        return validated_data
+        return instantce
+            
+    def create(self, validated_data):
+        return self.change_owner(validated_data)
 
     def update(self, instance, validated_data):
-        product = get_object_or_404(Products, id=instance['product_id'])
-        user = get_object_or_404(User, id=instance['user_id'])
-        product.owner = user
-        product.save()
-        return instance
+        return self.change_owner(validated_data)
 
 class DenySerializer(AcceptSerializer):
-    def create(self, validated_data):
-        product = get_object_or_404(Products, id=validated_data['product_id'])
-        user = get_object_or_404(User, id=validated_data['user_id'])
-        product.allow_token = generate_token()
-        product.save()
-        return validated_data
-
-    def update(self, instance, validated_data):
+    def reset_token(self, instance):
         product = get_object_or_404(Products, id=instance['product_id'])
         user = get_object_or_404(User, id=instance['user_id'])
         product.allow_token = generate_token()
         product.save()
         return instance
+
+    def create(self, validated_data):
+        return self.reset_token(validated_data)
+
+    def update(self, instance, validated_data):
+        return self.reset_token(validated_data)
 
 class EmailSerializer(serializers.Serializer): 
     product_id = serializers.IntegerField()

@@ -5,3 +5,5 @@ WeasyPrint>=0.34
 django-rest-swagger
 django-filter>=2.0.0
 djangorestframework-jwt
+pdfkit
+rest_condition
