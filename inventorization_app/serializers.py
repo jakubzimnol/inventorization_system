@@ -1,36 +1,42 @@
-from rest_framework import serializers
-from .models import Products
-from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-from django.urls import reverse
 import secrets
+
+from django.contrib.auth.models import User
+from django.core.mail import EmailMultiAlternatives
+from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.html import strip_tags
+from rest_framework import serializers
+
+from .models import Products
+
 generate_token = secrets.token_urlsafe
+
 
 class ApiSerializer(serializers.ModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
+
     class Meta:
         model = Products
-        fields = ('id', 
-            'product_key', 
-            'name', 
-            'category',
-            'owner')
+        fields = ('id',
+                  'product_key',
+                  'name',
+                  'category',
+                  'owner')
 
     def create(self, validated_data):
         product = Products(
             name=validated_data['name'],
             product_key=validated_data['product_key'],
             category=validated_data['category'],
-            allow_token = generate_token(10)
+            allow_token=generate_token(10)
         )
         product.save()
         return product
 
+
 class AcceptSerializer(serializers.Serializer):
-    token = serializers.CharField(max_length=20, default='') 
+    token = serializers.CharField(max_length=20, default='')
     product_id = serializers.IntegerField()
     user_id = serializers.IntegerField()
 
@@ -48,12 +54,13 @@ class AcceptSerializer(serializers.Serializer):
         product.owner = user
         product.save()
         return instantce
-            
+
     def create(self, validated_data):
         return self.change_owner(validated_data)
 
     def update(self, instance, validated_data):
         return self.change_owner(validated_data)
+
 
 class DenySerializer(AcceptSerializer):
     def reset_token(self, instance):
@@ -69,7 +76,8 @@ class DenySerializer(AcceptSerializer):
     def update(self, instance, validated_data):
         return self.reset_token(validated_data)
 
-class EmailSerializer(serializers.Serializer): 
+
+class EmailSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     user_id = serializers.IntegerField()
 
@@ -81,15 +89,19 @@ class EmailSerializer(serializers.Serializer):
         product = get_object_or_404(Products, id=product_id)
         product.allow_token = generate_token(10)
         product.save()
-        domain_accept = request.build_absolute_uri(reverse('products:products-accept', kwargs={'user_id':user.id,'pk':product.id,'token':product.allow_token}))
-        domain_deny = request.build_absolute_uri(reverse( 'products:products-deny', kwargs={'user_id':user.id,'pk':product.id,'token':product.allow_token}))
+        domain_accept = request.build_absolute_uri(reverse('products:products-accept',
+                                                           kwargs={'user_id': user.id, 'pk': product.id,
+                                                                   'token': product.allow_token}))
+        domain_deny = request.build_absolute_uri(reverse('products:products-deny',
+                                                         kwargs={'user_id': user.id, 'pk': product.id,
+                                                                 'token': product.allow_token}))
         context = {
-            'product':product,
-            'user':user,
-            'domain_accept':domain_accept,
-            'domain_deny':domain_deny} 
+            'product': product,
+            'user': user,
+            'domain_accept': domain_accept,
+            'domain_deny': domain_deny}
         subject, from_email, to = 'Borrow request', 'pythoninventorizationproject@gmail.com', 'pythoninventorizationproject@gmail.com'
-        html_content = render_to_string('borrow_request.html', context) 
+        html_content = render_to_string('borrow_request.html', context)
         text_content = strip_tags(html_content)
         msg = EmailMultiAlternatives(subject, text_content, from_email, [to])
         msg.attach_alternative(html_content, "text/html")
@@ -102,6 +114,7 @@ class EmailSerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         self.send_mail(validated_data)
         return validated_data
+
 
 class UserSerializer(serializers.ModelSerializer):
     products = serializers.PrimaryKeyRelatedField(many=True, queryset=Products.objects.all())
