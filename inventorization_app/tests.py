@@ -54,7 +54,6 @@ class InventorizationAPITestCase(APITestCase):
     def test_post_item_super_authorized(self):
         self.client.force_login(self.my_admin)
         response = self.client.post(self.url_list, self.product_data, format='json')
-        # import pdb;pdb.set_trace()
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_get_item(self):
@@ -144,3 +143,5 @@ class InventorizationAPITestCase(APITestCase):
         self.client.force_login(self.my_admin)
         response = self.client.post(self.url_deny, self.empty_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    #def test_

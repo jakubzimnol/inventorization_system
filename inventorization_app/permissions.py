@@ -5,7 +5,7 @@ class IsAdmin(permissions.BasePermission):
     """
     Custom permission to only allow admin to edit it.
     """
-    def has_permision(self, request, view):
+    def has_permission(self, request, view):
         return request.user.is_superuser
 
     def has_object_permission(self, request, view, obj):
@@ -15,7 +15,7 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow admin and owners of an object to edit it.
     """
-    def has_permision(self, request, view):
+    def has_permission(self, request, view):
         return request.method in permissions.SAFE_METHODS
 
     def has_object_permission(self, request, view, obj):
