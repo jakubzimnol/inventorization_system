@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+
 from .models import Products
 
 
@@ -14,7 +15,7 @@ class InventorizationAPITestCase(APITestCase):
         cls.my_admin = User.objects.create_superuser(
             'superuser', 'test@test.com', 'randompassword')
         cls.product = Products.objects.create(
-            name='name', product_key=999, category='category', allow_token='1234567890',)
+            name='name', product_key=999, category='category', allow_token='1234567890', )
         cls.product_data = {"name": "some_name", "product_key": 1234, "category": "category", }
         cls.empty_data = {}
         cls.token_data = {'pk': cls.product.pk, 'user_id': cls.user.id, 'token': '1234567890'}
@@ -23,8 +24,8 @@ class InventorizationAPITestCase(APITestCase):
         cls.url_detail = reverse("products:products-detail", kwargs={'pk': cls.product.pk})
         cls.url_email = reverse("products:products-email", kwargs={'pk': cls.product.pk})
         cls.url_createpdf = reverse("products:products-createpdf")
-        cls.url_accept = reverse("products:products-accept", kwargs= cls.token_data)
-        cls.url_deny = reverse("products:products-deny", kwargs= cls.token_data)
+        cls.url_accept = reverse("products:products-accept", kwargs=cls.token_data)
+        cls.url_deny = reverse("products:products-deny", kwargs=cls.token_data)
 
     def setUp(self):
         super().setUp()
@@ -143,5 +144,3 @@ class InventorizationAPITestCase(APITestCase):
         self.client.force_login(self.my_admin)
         response = self.client.post(self.url_deny, self.empty_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    #def test_
