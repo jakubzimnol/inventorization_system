@@ -1,120 +1,71 @@
-from django.shortcuts import render
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.models import User
-from easy_pdf.views import PDFTemplateView
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-from django.urls import reverse
-from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
+import pdfkit
+from django.http import HttpResponse
+from django.template import loader
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
-from rest_framework import generics
-from rest_framework.permissions import IsAdminUser 
+from rest_framework import status
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
-import django_filters.rest_framework
+from rest_framework.response import Response
+
 from .models import Products
-from .serializers import Api_serializer
-from .permissions import IsAdminOrOwnerOrReadOnly
-import secrets
-generate_token = secrets.token_urlsafe
-
-def send_mail_to_admin(request, pk=None):
-    user=request.user
-    product = get_object_or_404(Products, id=pk)
-    product.allow_token = generate_token(10) 
-    product.save()
-    domain_accept = request.build_absolute_uri(reverse('products:owner_accept', args=[user.id,product.id,product.allow_token]))
-    domain_deny = request.build_absolute_uri(reverse( 'products:owner_deny', args=[user.id,product.id,product.allow_token]))
-    context = {
-        'product':product,
-        'user':user,
-        'domain_accept':domain_accept,
-        'domain_deny':domain_deny} 
-    subject, from_email, to = 'Borrow request', 'pythoninventorizationproject@gmail.com', 'pythoninventorizationproject@gmail.com'
-    html_content = render_to_string('borrow_request.html', context) 
-    text_content = strip_tags(html_content)
-    msg = EmailMultiAlternatives(subject, text_content, from_email, [to])
-    msg.attach_alternative(html_content, "text/html")
-    msg.send()
-    return render(request, 'test.html')
-
-class AcceptOwnerView(viewsets.ViewSet):
-    serializer_class = Api_serializer
-
-    def retrive(self, request, user, pk, token):
-        queryset = Products.objects.filter(id=pk)
-        product = get_object_or_404(Products, id=pk)
-        user = get_object_or_404(User, id=user)
-        print(product.allow_token)
-        print(token)
-        if token == product.allow_token:
-            product.owner = user
-            product.save()
-            serializer = Api_serializer(data=product)
-            if serializer.is_valid():
-                return Response(serializer.data, 
-                                status=status.HTTP_202_ACCEPTED)
-            else:
-                return Response(serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
-        else:
-            serializer = Api_serializer(data=product)
-            if serializer.is_valid():
-                return Response(serializer.data, 
-                                status=status.HTTP_202_ACCEPTED)
-            else:
-                return Response(serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
-            
-class DenyOwnerView(viewsets.ViewSet):  
-
-    def retrive(self, request, user, token, pk): 
-        queryset = Products.objects.filter(id=pk)
-        product = get_object_or_404(Products, id=pk)
-        user = get_object_or_404(User, id=user)
-    
-        serializer = Api_serializer(data=product)
-        if serializer.is_valid():
-            return Response(serializer.data, 
-                            status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST)  
+from .permissions import IsOwnerOrReadOnly, IsAdmin
+from .permissions import permision_or
+from .serializers import AcceptSerializer
+from .serializers import ApiSerializer
+from .serializers import DenySerializer
+from .serializers import EmailSerializer
 
 
-class ProductListView(generics.ListAPIView):
+class ProductViewSet(viewsets.ModelViewSet):
     queryset = Products.objects.all()
-    serializer_class = Api_serializer
-    permission_classes = (IsAuthenticated,)
-    filter_backends = (filters.SearchFilter, django_filters.rest_framework.DjangoFilterBackend)
+    serializer_class = ApiSerializer
+    filter_backends = (filters.SearchFilter, DjangoFilterBackend)
     search_fields = ('product_key', 'name', 'category')
     filter_fields = ('product_key', 'name', 'category')
+    permission_classes = (IsAuthenticated, permision_or(IsAdmin, IsOwnerOrReadOnly))
 
+    def validate_and_response(self, serializer, data):
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class ProductCreateView(generics.CreateAPIView):
-    queryset = Products.objects.all()
-    serializer_class = Api_serializer
-    permission_classes = (IsAdminUser,)
+    @action(methods=['post'], detail=True, url_path=r'accept/(?P<user_id>\d+)/(?P<token>\w+)', url_name='accept',
+            permission_classes=(IsAdminUser,))
+    def accept_owner(self, request, user_id, pk, token):
+        data = {'user_id': user_id,
+                'product_id': pk,
+                'token': token, }
+        serializer = AcceptSerializer(data=data)
+        return self.validate_and_response(serializer, data)
 
+    @action(methods=['post'], detail=True, url_path=r'deny/(?P<user_id>\d+)/(?P<token>\w+)', url_name='deny',
+            permission_classes=(IsAdminUser,))
+    def deny_owner(self, request, user_id, pk, token):
+        data = {'user_id': user_id,
+                'product_id': pk,
+                'token': token, }
+        serializer = DenySerializer(data=data)
+        return self.validate_and_response(serializer, data)
 
-class ProductRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView): 
-    serializer_class = Api_serializer
-    permission_classes = (IsAdminOrOwnerOrReadOnly, IsAuthenticated, )
-    def get_queryset(self):
-        productc = Products.objects.filter(id=self.kwargs['pk'])
-        return productc
+    @action(methods=['post'], detail=True, permission_classes=(IsAuthenticated,), url_name='email')
+    def send_mail_to_admin(self, request, pk=None):
+        user = request.user
+        data = {'user_id': user.id,
+                'product_id': pk, }
+        serializer = EmailSerializer(data=data, context={'request': request})
+        return self.validate_and_response(serializer, data)
 
-
-class ProductListPDFView(PDFTemplateView):
-    template_name = 'product_list.html'
-    permission_classes = (IsAdminUser,)   
-    def get_context_data(self, **kwargs):
+    @action(methods=['post'], detail=False, url_path=r'createpdf', url_name='createpdf',
+            permission_classes=(IsAdminUser,))
+    def create_pdf(self, request):
         products = Products.objects.all()
-        print(products)
-        return super(ProductListPDFView, self).get_context_data(
-            pagesize='A4',
-            products=products,
-            **kwargs
-        )    
+        html = loader.render_to_string('product_list.html', {'products': products})
+        output = pdfkit.from_string(html, output_path=False)
+        response = HttpResponse(content_type="application/pdf")
+        response.write(output)
+        return response
