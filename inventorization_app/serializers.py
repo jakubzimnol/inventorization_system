@@ -81,29 +81,34 @@ class EmailSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     user_id = serializers.IntegerField()
 
-    def send_mail(self, instance):
-        request = self.context['request']
-        product_id = instance['product_id']
-        user_id = instance['user_id']
-        user = get_object_or_404(User, id=user_id)
-        product = get_object_or_404(Products, id=product_id)
+    def generate_product_token(self, product):
         product.allow_token = generate_token(10)
         product.save()
-        domain_accept = request.build_absolute_uri(reverse('products:products-accept',
-                                                           kwargs={'user_id': user.id, 'pk': product.id,
-                                                                   'token': product.allow_token}))
-        domain_deny = request.build_absolute_uri(reverse('products:products-deny',
-                                                         kwargs={'user_id': user.id, 'pk': product.id,
-                                                                 'token': product.allow_token}))
-        context = {
-            'product': product,
-            'user': user,
-            'domain_accept': domain_accept,
-            'domain_deny': domain_deny}
-        subject, from_email, to = 'Borrow request', 'pythoninventorizationproject@gmail.com', 'pythoninventorizationproject@gmail.com'
+
+    def get_data_from_db(self, validated_data):
+        request = self.context['request']
+        product_id = validated_data['product_id']
+        user_id = validated_data['user_id']
+        user = get_object_or_404(User, id=user_id)
+        product = get_object_or_404(Products, id=product_id)
+        self.generate_product_token(product)
+        return user, product, request
+
+    def generate_mail_message(self, user, product, request):
+        url_data = {'user_id': user.id, 'pk': product.id, 'token': product.allow_token}
+        domain_accept = request.build_absolute_uri(reverse('products:products-accept', kwargs=url_data))
+        domain_deny = request.build_absolute_uri(reverse('products:products-deny', kwargs=url_data))
+        context = {'product': product, 'user': user, 'domain_accept': domain_accept, 'domain_deny': domain_deny}
+        subject, from_email = 'Borrow request', 'pythoninventorizationproject@gmail.com'
+        to = 'pythoninventorizationproject@gmail.com'
         html_content = render_to_string('borrow_request.html', context)
         text_content = strip_tags(html_content)
         msg = EmailMultiAlternatives(subject, text_content, from_email, [to])
+        return msg, html_content
+
+    def send_mail(self, validated_data):
+        user, product, request = self.get_data_from_db(validated_data)
+        msg, html_content = self.generate_mail_message(user, product, request)
         msg.attach_alternative(html_content, "text/html")
         msg.send()
 

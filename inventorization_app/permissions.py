@@ -33,7 +33,7 @@ def permision_or(permision1, permision2):
                    permision2.has_object_permission(self=self, request=request, view=view, obj=obj)
 
         def has_permission(self, request, view):
-            return permision1.has_permision(self=self, request=request, view=view) or \
-                   permision2.has_permision(self=self, request=request, view=view)
+            return permision1.has_permission(self=self, request=request, view=view) or \
+                   permision2.has_permission(self=self, request=request, view=view)
 
     return Permision
